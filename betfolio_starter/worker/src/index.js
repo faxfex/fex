@@ -65,11 +65,22 @@ function requireEnv(env, names) {
   const missing = names.filter(n => !env[n]);
   if (missing.length) throw new Error("Worker secrets/vars missing: " + missing.join(", "));
 }
+function supabaseServiceHeaders(env, extra = {}) {
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  const headers = new Headers(extra);
+  headers.set("apikey", key);
+  // Supabase's newer sb_secret_* keys are API keys, not JWTs: send them via
+  // apikey only. Legacy service_role keys are JWTs and still use Bearer auth.
+  if (key.startsWith("sb_secret_")) {
+    headers.delete("Authorization");
+  } else {
+    headers.set("Authorization", `Bearer ${key}`);
+  }
+  return headers;
+}
 async function sb(env, path, options = {}) {
   requireEnv(env, ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]);
-  const headers = new Headers(options.headers || {});
-  headers.set("apikey", env.SUPABASE_SERVICE_ROLE_KEY);
-  headers.set("Authorization", `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`);
+  const headers = supabaseServiceHeaders(env, options.headers || {});
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const response = await fetch(`${env.SUPABASE_URL}${path}`, { ...options, headers });
   const text = await response.text();
@@ -96,6 +107,21 @@ async function processUpdate(update, env) {
   // Private chats only. Do not permit use in groups/supergroups.
   if (msg.chat.type !== "private") return;
 
+  const text = (msg.text || msg.caption || "").trim();
+  const command = (text.split(/\s+/)[0] || "").split("@")[0].toLowerCase();
+
+  // Bootstrap command must work before Supabase schema/service key is configured.
+  // The webhook secret is already checked in fetch(), so only Telegram webhook
+  // requests carrying the configured secret can reach this handler.
+  if (command === "/whoami") {
+    try {
+      await reply(env, chatId, `Telegram User ID ของคุณคือ: ${telegramUserId}\nนำค่านี้ไปตั้งเป็น Worker secret: ALLOWED_TELEGRAM_USER_ID`);
+    } catch (e) {
+      console.error("Telegram /whoami reply failed", e);
+    }
+    return;
+  }
+
   // Telegram may retry webhooks; process every update_id only once.
   if (update.update_id != null) {
     try {
@@ -111,14 +137,8 @@ async function processUpdate(update, env) {
     }
   }
 
-  const text = (msg.text || msg.caption || "").trim();
-  const command = (text.split(/\s+/)[0] || "").split("@")[0].toLowerCase();
   if (!env.ALLOWED_TELEGRAM_USER_ID) {
-    if (command === "/whoami") {
-      await reply(env, chatId, `Telegram User ID ของคุณคือ: ${telegramUserId}\nนำค่านี้ไปตั้งเป็น Worker secret: ALLOWED_TELEGRAM_USER_ID แล้วจึงใช้บอทได้`);
-    } else {
-      await reply(env, chatId, "บอทยังไม่ถูกล็อกกับเจ้าของ กรุณาส่ง /whoami เพื่อดู Telegram ID แล้วตั้งค่า ALLOWED_TELEGRAM_USER_ID ก่อน");
-    }
+    await reply(env, chatId, "บอทยังไม่ถูกล็อกกับเจ้าของ กรุณาตั้งค่า ALLOWED_TELEGRAM_USER_ID ก่อนใช้งาน");
     return;
   }
   if (telegramUserId !== String(env.ALLOWED_TELEGRAM_USER_ID)) {
@@ -130,7 +150,6 @@ async function processUpdate(update, env) {
     if (msg.photo?.length) { await handlePhoto(msg, env); return; }
     if (!text) return;
     if (command === "/start" || command === "/help") { await reply(env, chatId, helpText(env)); return; }
-    if (command === "/whoami") { await reply(env, chatId, `เชื่อมต่อเจ้าของบอทแล้ว · Telegram ID ${telegramUserId}`); return; }
     if (command === "/today") { await handlePeriod(chatId, env, thaiDate(), thaiDate(), "สรุปวันนี้"); return; }
     if (command === "/summary") { const m = thaiMonth(); await handlePeriod(chatId, env, `${m}-01`, monthEnd(m), `สรุปเดือน ${m}`); return; }
     if (command === "/month") {
@@ -207,7 +226,7 @@ async function handlePhoto(msg, env) {
   const ext = (meta.file_path || "photo.jpg").toLowerCase().endsWith(".png") ? "png" : "jpg";
   const path = `${env.SUPABASE_USER_ID}/telegram-${Date.now()}-${msg.message_id}.${ext}`;
   const upload = await fetch(`${env.SUPABASE_URL}/storage/v1/object/bill-images/${path}`, {
-    method: "POST", headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": ext === "png" ? "image/png" : "image/jpeg", "x-upsert": "true" }, body: buffer
+    method: "POST", headers: supabaseServiceHeaders(env, { "Content-Type": ext === "png" ? "image/png" : "image/jpeg", "x-upsert": "true" }), body: buffer
   });
   if (!upload.ok) throw new Error(`Image storage failed: ${(await upload.text()).slice(0,300)}`);
   let ocrText = "";
