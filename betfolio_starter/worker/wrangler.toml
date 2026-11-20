@@ -1,0 +1,13 @@
+name = "betfolio-telegram"
+main = "src/index.js"
+compatibility_date = "2026-11-20"
+
+[vars]
+# Public project URL is not a secret. Set these values before deployment.
+SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co"
+SUPABASE_USER_ID = "YOUR_SUPABASE_AUTH_USER_UUID"
+APP_URL = "https://YOUR_BETFOLIO_PAGES_URL"
+
+[triggers]
+# Checks daily/monthly TP, SL and budget thresholds. Each event is sent once per period.
+crons = ["*/15 * * * *"]
