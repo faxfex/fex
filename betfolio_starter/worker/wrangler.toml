@@ -4,9 +4,9 @@ compatibility_date = "2026-11-20"
 
 [vars]
 # Public project URL is not a secret. Set these values before deployment.
-SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co"
-SUPABASE_USER_ID = "YOUR_SUPABASE_AUTH_USER_UUID"
-APP_URL = "https://YOUR_BETFOLIO_PAGES_URL"
+SUPABASE_URL = "https://mqdfeqdikrtaarsibdta.supabase.co"
+SUPABASE_USER_ID = "a1ab9b86-2b88-4d4b-a7a4-ec840b302363"
+APP_URL = "https://fexbet.fax7899.workers.dev/"
 
 [triggers]
 # Checks daily/monthly TP, SL and budget thresholds. Each event is sent once per period.
