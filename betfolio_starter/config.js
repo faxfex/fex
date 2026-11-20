@@ -2,7 +2,7 @@
 // Safe to publish ONLY the Supabase project URL and anon/publishable key here.
 // Never put a service_role key, Telegram bot token, or OCR API key in this file.
 window.BETFOLIO_CONFIG = {
-  SUPABASE_URL: "https://mqdfeqdikrtaarsibdta.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_UVk1y4GIl3yR5q8bBIbXOQ_op_ttnLd",
-  TELEGRAM_BOT_USERNAME: "9283185700:AAG5brDzHcFqUGAU_CZZ8wZecSL-dI2QObc"
+  SUPABASE_URL: "",
+  SUPABASE_ANON_KEY: "",
+  TELEGRAM_BOT_USERNAME: ""
 };
